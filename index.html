@@ -391,7 +391,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
   <div class="chart-card">
     <div class="chart-header">
       <div class="chart-title">14-day caloric deficit</div>
-      <div style="display:flex;gap:16px;align-items:center;">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         <div style="text-align:right">
           <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">total deficit</div>
           <div style="font-family:var(--mono);font-size:16px;font-weight:400;" id="d14total">—</div>
@@ -399,6 +399,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
         <div style="text-align:right">
           <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">est. fat lost</div>
           <div style="font-family:var(--mono);font-size:16px;font-weight:400;color:var(--accent);" id="d14fat">—</div>
+        </div>
+        <div style="text-align:right" id="obsTDEEBox" style="display:none">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">observed TDEE</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:400;color:var(--accent3);" id="d14obsTDEE">—</div>
+        </div>
+        <div style="text-align:right" id="corrFactorBox" style="display:none">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">correction ×</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:400;" id="d14corrFactor">—</div>
         </div>
       </div>
     </div>
@@ -817,11 +825,16 @@ function calcBMR(w){
   return 10*w+6.25*p.height_cm-5*p.age+5;
 }
 
-function calcTDEE(wKg,steps,sedHrs,sleepHrs,sessionBonus){
+function calcTDEE(wKg,steps,sedHrs,sleepHrs,sessionBonus,bypassCorrection){
   const w=wKg||getCurrentWeight();
   const sed=(sedHrs!=null&&!isNaN(sedHrs))?sedHrs:8;
   const actFactor=Math.max(1.1,1.2-Math.max(0,sed-6)*0.01);
-  return Math.round(calcBMR(w)*actFactor+(steps||0)*0.04+(sessionBonus||0));
+  const base=Math.round(calcBMR(w)*actFactor+(steps||0)*0.04+(sessionBonus||0));
+  // Apply personal correction factor if available, confidence>=7, and not bypassed
+  if(!bypassCorrection&&userProfile&&userProfile.tdee_correction&&(userProfile.tdee_correction_confidence||0)>=7){
+    return Math.round(base*userProfile.tdee_correction);
+  }
+  return base;
 }
 
 function macroKcal(p,f,c){return Math.round((p||0)*4+(f||0)*9+(c||0)*4);}
@@ -1189,16 +1202,57 @@ function renderDeficitChart(){
   totalEl.style.color=total>=0?'var(--accent2)':'var(--red)';
   document.getElementById('d14fat').textContent=total>0?fatG+' g':'0 g';
 
-  // Accuracy comparison
+  // ── Back-calculation: observed TDEE & correction factor ──────────
   const allPts=getAllWeightPoints();
-  const pace=calcPace(allPts); // kg/week from actual weight
+  const pace=calcPace(allPts); // kg/week from actual scale
   const accRow=document.getElementById('accuracyRow');
-  if(pace!=null&&total>0){
-    accRow.style.display='flex';
-    // pace is negative for weight loss; convert to kg lost over 14 days
+
+  // Find days in last 14 that have BOTH weight and calories logged
+  const completeDays=days.filter(d=>{
+    const l=logMap[d];
+    return l&&l.weight!=null&&l.cal!=null;
+  });
+  const confidence=completeDays.length; // 0–14
+
+  // Show/hide observed TDEE & correction boxes
+  const obsTDEEBox=document.getElementById('obsTDEEBox');
+  const corrBox=document.getElementById('corrFactorBox');
+
+  if(confidence>=7&&pace!=null&&pace<0){
+    // Observed TDEE = (total logged kcal + actual kg lost × 7700) / days with cal data
+    const totalLoggedKcal=days.reduce((s,d)=>{
+      const l=logMap[d];return s+(l&&l.cal?l.cal:0);
+    },0);
+    const daysWithCal=days.filter(d=>logMap[d]&&logMap[d].cal).length;
     const actualLost14=Math.abs(pace)/7*14; // kg
-    const estimatedLost14=total/7700; // kg from deficit
-    const discrepancy=Math.abs(actualLost14-estimatedLost14)/Math.max(actualLost14,estimatedLost14)*100;
+    const observedTDEETotal=totalLoggedKcal+actualLost14*7700;
+    const observedTDEEPerDay=Math.round(observedTDEETotal/Math.max(daysWithCal,1));
+
+    // Formula TDEE average over same period (use current weight as proxy)
+    const formulaTDEE=calcTDEE(null,null,null,null,0,true); // bypass correction
+    const corrFactor=observedTDEEPerDay/formulaTDEE;
+
+    // Clamp to reasonable range (0.75–1.35)
+    const clampedFactor=Math.min(1.35,Math.max(0.75,corrFactor));
+
+    // Store on userProfile for use in calcTDEE — only if confidence>=7
+    if(userProfile){
+      userProfile.tdee_correction=parseFloat(clampedFactor.toFixed(3));
+      userProfile.tdee_correction_confidence=confidence;
+    }
+
+    // Display
+    obsTDEEBox.style.display='block';
+    corrBox.style.display='block';
+    document.getElementById('d14obsTDEE').textContent=observedTDEEPerDay.toLocaleString()+' kcal';
+    const corrEl=document.getElementById('d14corrFactor');
+    corrEl.textContent=clampedFactor.toFixed(2);
+    corrEl.style.color=clampedFactor>1.05?'var(--accent3)':clampedFactor<0.95?'var(--accent2)':'var(--accent)';
+
+    // Accuracy comparison using observed vs formula
+    accRow.style.display='flex';
+    const estimatedLost14=total/7700;
+    const discrepancy=Math.abs(actualLost14-estimatedLost14)/Math.max(actualLost14,0.001)*100;
     let label,cls;
     if(discrepancy<=5){label='very accurate';cls='acc-very-accurate';}
     else if(discrepancy<=15){label='accurate';cls='acc-accurate';}
@@ -1206,10 +1260,38 @@ function renderDeficitChart(){
     else{label='very inaccurate';cls='acc-very-inaccurate';}
     document.getElementById('accuracyPill').textContent=label;
     document.getElementById('accuracyPill').className='accuracy-pill '+cls;
+    const confLabel=confidence>=12?'high confidence':confidence>=7?'moderate confidence':'low confidence';
     document.getElementById('accuracyDetail').textContent=
-      `deficit implies ${estimatedLost14.toFixed(2)}kg lost · scale shows ${actualLost14.toFixed(2)}kg · ${Math.round(discrepancy)}% discrepancy`;
+      `deficit implies ${estimatedLost14.toFixed(2)}kg · scale shows ${actualLost14.toFixed(2)}kg · ${Math.round(discrepancy)}% gap · ${confLabel} (${confidence}/14 days complete)`;
+
+    // Persist correction factor silently to Supabase (fire and forget)
+    if(userProfile&&userProfile.tdee_correction){
+      sbFetch(`user_profiles?username=eq.${encodeURIComponent(currentUser)}`,'DELETE')
+        .then(()=>sbFetch('user_profiles','POST',userProfile))
+        .catch(()=>{});
+    }
+
   } else {
-    accRow.style.display='none';
+    obsTDEEBox.style.display='none';
+    corrBox.style.display='none';
+    if(pace!=null&&total>0){
+      accRow.style.display='flex';
+      const actualLost14=Math.abs(pace)/7*14;
+      const estimatedLost14=total/7700;
+      const discrepancy=Math.abs(actualLost14-estimatedLost14)/Math.max(actualLost14,0.001)*100;
+      let label,cls;
+      if(discrepancy<=5){label='very accurate';cls='acc-very-accurate';}
+      else if(discrepancy<=15){label='accurate';cls='acc-accurate';}
+      else if(discrepancy<=45){label='inaccurate';cls='acc-inaccurate';}
+      else{label='very inaccurate';cls='acc-very-inaccurate';}
+      document.getElementById('accuracyPill').textContent=label;
+      document.getElementById('accuracyPill').className='accuracy-pill '+cls;
+      const needed=Math.max(0,7-confidence);
+      document.getElementById('accuracyDetail').textContent=
+        `${confidence}/14 days complete · log ${needed} more full days to enable TDEE correction`;
+    } else {
+      accRow.style.display='none';
+    }
   }
 
   const bgC=data.map(v=>v>700?'rgba(240,160,96,0.75)':v>=300?'rgba(200,240,96,0.75)':v>=0?'rgba(96,200,240,0.6)':'rgba(240,96,96,0.7)');
