@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stinson's Fitness Log</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0f11; --surface: #161719; --surface2: #1e2022;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #f0f0ee; --muted: #6b6d72;
+    --accent: #c8f060; --accent2: #60c8f0; --accent3: #f0a060; --accent4: #f06090; --red: #f06060;
+    --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  .app { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* Login screen */
+  .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 380px; text-align: center; }
+  .login-logo { font-family: var(--mono); font-size: 28px; font-weight: 300; color: var(--accent); letter-spacing: -0.03em; margin-bottom: 6px; }
+  .login-sub { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 2rem; }
+  .login-label { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; display: block; text-align: left; margin-bottom: 6px; }
+  .login-input { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 15px; padding: 11px 14px; outline: none; margin-bottom: 14px; }
+  .login-input:focus { border-color: var(--accent); }
+  .login-btn { width: 100%; background: var(--accent); color: #0e0f11; border: none; border-radius: 8px; font-family: var(--mono); font-size: 13px; font-weight: 500; padding: 12px; cursor: pointer; transition: opacity 0.15s; }
+  .login-btn:hover { opacity: 0.88; }
+  .login-hint { font-size: 11px; color: var(--muted); margin-top: 14px; font-family: var(--mono); }
+
+  /* Header */
+  .header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  .header-left h1 { font-family: var(--mono); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--text); }
+  .header-left p { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+  .header-right { display: flex; align-items: flex-end; gap: 16px; }
+  .current-weight { text-align: right; }
+  .current-weight .num { font-family: var(--mono); font-size: 36px; font-weight: 300; color: var(--accent); letter-spacing: -0.03em; }
+  .current-weight .label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .logout-btn { background: none; border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+  .logout-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Stats */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat-label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .stat-val { font-family: var(--mono); font-size: 20px; font-weight: 400; }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+  .c-green { color: var(--accent); } .c-blue { color: var(--accent2); } .c-orange { color: var(--accent3); }
+  .c-pink { color: var(--accent4); } .c-red { color: var(--red); } .c-muted { color: var(--muted); }
+
+  /* Charts */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .chart-title { font-family: var(--mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .chart-tabs { display: flex; gap: 4px; }
+  .ctab { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
+  .ctab.active, .ctab:hover { border-color: var(--accent); color: var(--accent); }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-legend { display: flex; gap: 16px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-family: var(--mono); color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Goals */
+  .goals-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .section-title { font-family: var(--mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+  .goals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .goal-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .goal-name { font-size: 13px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .goal-icon { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .goal-bar-bg { height: 3px; background: var(--border2); border-radius: 2px; margin-bottom: 6px; }
+  .goal-bar { height: 3px; border-radius: 2px; transition: width 0.5s ease; }
+  .goal-status { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+
+  /* Log form */
+  .log-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .log-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .log-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .field input, .field textarea { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 13px; padding: 9px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { min-height: 60px; resize: vertical; font-family: var(--sans); font-size: 13px; }
+  .toggle-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .toggle-btn { flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+  .toggle-btn.active { border-color: var(--accent); background: rgba(200,240,96,0.07); color: var(--accent); }
+  .toggle-btn .tb-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; }
+  .toggle-btn .tb-val { font-size: 13px; font-weight: 500; }
+
+  /* Deficit preview */
+  .deficit-preview { background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .dp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 10px; }
+  .dp-item { display: flex; flex-direction: column; gap: 3px; }
+  .dp-label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .dp-val { font-family: var(--mono); font-size: 18px; font-weight: 400; }
+  .dp-sub { font-size: 10px; font-family: var(--mono); color: var(--muted); }
+  .deficit-bar-bg { height: 4px; background: var(--border2); border-radius: 2px; }
+  .deficit-bar-fill { height: 4px; border-radius: 2px; transition: width 0.3s, background 0.3s; }
+
+  .submit-btn { width: 100%; background: var(--accent); color: #0e0f11; border: none; border-radius: 8px; font-family: var(--mono); font-size: 13px; font-weight: 500; padding: 11px; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.02em; }
+  .submit-btn:hover { opacity: 0.88; }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Sync status */
+  .sync-status { font-family: var(--mono); font-size: 11px; text-align: center; padding: 6px; margin-top: 8px; border-radius: 6px; }
+  .sync-ok { color: var(--accent); } .sync-err { color: var(--red); } .sync-loading { color: var(--muted); }
+
+  /* History */
+  .history-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .entry { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .entry.s-calisthenics { border-left: 3px solid #f06060; }
+  .entry.s-tennis       { border-left: 3px solid #60c8f0; }
+  .entry.s-both         { border-left: 3px solid #a060f0; }
+  .entry-top { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
+  .entry-date { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 68px; }
+  .entry-weight { font-family: var(--mono); font-size: 15px; font-weight: 400; color: var(--accent); min-width: 50px; }
+  .entry-macros { display: flex; gap: 10px; font-family: var(--mono); font-size: 11px; flex-wrap: wrap; }
+  .em { display: flex; flex-direction: column; }
+  .em-val { color: var(--text); } .em-label { color: var(--muted); font-size: 10px; }
+  .entry-bottom { display: flex; gap: 12px; font-size: 11px; font-family: var(--mono); color: var(--muted); flex-wrap: wrap; margin-top: 2px; }
+  .deficit-pos { color: var(--accent); font-weight: 500; } .deficit-neg { color: var(--red); font-weight: 500; }
+  .empty-state { text-align: center; padding: 2rem; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .loading-state { text-align: center; padding: 2rem; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--accent); color: #0e0f11; padding: 10px 18px; border-radius: 8px; font-family: var(--mono); font-size: 12px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 99; }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 600px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .goals-grid { grid-template-columns: 1fr; }
+    .log-3col { grid-template-columns: repeat(2, 1fr); }
+    .dp-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">stinson's</div>
+    <div class="login-sub">fitness log</div>
+    <label class="login-label">your username</label>
+    <input class="login-input" type="text" id="loginInput" placeholder="e.g. stinson" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <button class="login-btn" onclick="doLogin()">enter →</button>
+    <div class="login-hint">choose any name — your data stays yours</div>
+  </div>
+</div>
+
+<!-- Main app (hidden until login) -->
+<div class="app" id="mainApp" style="display:none">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>stinson's fitness log</h1>
+      <p id="headerSub">32M · 175cm · active cut</p>
+    </div>
+    <div class="header-right">
+      <div class="current-weight">
+        <div class="num" id="currentWeightDisplay">—</div>
+        <div class="label">kg · latest</div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">← switch user</button>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-label">7-day avg kcal</div>
+      <div class="stat-val c-blue" id="s7kcal">—</div>
+      <div class="stat-sub">target ~2050</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">7-day avg protein</div>
+      <div class="stat-val c-green" id="s7prot">—</div>
+      <div class="stat-sub">target 160g+</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">avg daily deficit</div>
+      <div class="stat-val c-orange" id="s7deficit">—</div>
+      <div class="stat-sub">7-day avg kcal</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">weekly loss pace</div>
+      <div class="stat-val" id="sPace">—</div>
+      <div class="stat-sub">kg / week</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">weight trend + projection</div>
+      <div class="chart-tabs">
+        <button class="ctab active" onclick="setView('all',this)">all</button>
+        <button class="ctab" onclick="setView('3m',this)">3m</button>
+        <button class="ctab" onclick="setView('1m',this)">1m</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="wChart" role="img" aria-label="Weight trend chart with projection">Weight history and projected trend.</canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#c8f060"></div>actual</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#60c8f0;opacity:0.6"></div>projected</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f0a060"></div>goal ~75.5kg</div>
+    </div>
+  </div>
+
+  <div class="goals-card">
+    <div class="section-title">goals</div>
+    <div class="goals-grid" id="goalsGrid"></div>
+  </div>
+
+  <div class="log-card">
+    <div class="section-title">log today</div>
+    <div class="log-2col">
+      <div class="field"><label>Date</label><input type="date" id="fDate"></div>
+      <div class="field"><label>Morning weight (kg)</label><input type="number" id="fWeight" placeholder="79.1" step="0.1" oninput="updatePreview()"></div>
+    </div>
+    <div class="log-3col">
+      <div class="field"><label>Protein (g)</label><input type="number" id="fProt" placeholder="174" oninput="updatePreview()"></div>
+      <div class="field"><label>Fat (g)</label><input type="number" id="fFat" placeholder="59" oninput="updatePreview()"></div>
+      <div class="field"><label>Carbs (g)</label><input type="number" id="fCarbs" placeholder="185" oninput="updatePreview()"></div>
+    </div>
+    <div class="log-3col">
+      <div class="field"><label>Steps</label><input type="number" id="fSteps" placeholder="8000" oninput="updatePreview()"></div>
+      <div class="field"><label>Sedentary work (hrs)</label><input type="number" id="fSedentary" placeholder="8" step="0.5" min="0" max="16" oninput="updatePreview()"></div>
+      <div class="field"><label>Sleep (hrs)</label><input type="number" id="fSleep" placeholder="7.5" step="0.5" min="0" max="12" oninput="updatePreview()"></div>
+    </div>
+    <div class="toggle-row">
+      <button type="button" class="toggle-btn" id="tCalisthenics" onclick="toggleSession('calisthenics')">
+        <span class="tb-label">Calisthenics session</span>
+        <span class="tb-val" id="tCalisthenicsVal">none today</span>
+      </button>
+      <button type="button" class="toggle-btn" id="tTennis" onclick="toggleSession('tennis')">
+        <span class="tb-label">Tennis session</span>
+        <span class="tb-val" id="tTennisVal">none today</span>
+      </button>
+    </div>
+    <div class="deficit-preview">
+      <div class="dp-grid">
+        <div class="dp-item">
+          <div class="dp-label">Intake</div>
+          <div class="dp-val c-blue" id="dpIntake">—</div>
+          <div class="dp-sub">kcal from macros</div>
+        </div>
+        <div class="dp-item">
+          <div class="dp-label">Est. expenditure</div>
+          <div class="dp-val c-orange" id="dpTDEE">—</div>
+          <div class="dp-sub" id="dpTDEESub">BMR + activity</div>
+        </div>
+        <div class="dp-item">
+          <div class="dp-label">Deficit / surplus</div>
+          <div class="dp-val" id="dpDeficit">—</div>
+          <div class="dp-sub" id="dpDeficitSub">enter macros above</div>
+        </div>
+      </div>
+      <div class="deficit-bar-bg"><div class="deficit-bar-fill" id="deficitBar" style="width:0%"></div></div>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Activity / notes</label>
+      <textarea id="fActivity" placeholder="e.g. 4x pull-ups, 3x dips, handstand practice, rest day..."></textarea>
+    </div>
+    <button class="submit-btn" id="submitBtn" onclick="submitEntry()">save entry</button>
+    <div class="sync-status" id="syncStatus"></div>
+  </div>
+
+  <!-- 14-day deficit chart -->
+  <div class="chart-card" id="deficitChartCard">
+    <div class="chart-header">
+      <div class="chart-title">14-day caloric deficit</div>
+      <div style="display:flex;gap:16px;align-items:center;">
+        <div style="text-align:right">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">total deficit</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:400;" id="d14total">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">est. fat lost</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:400;color:var(--accent);" id="d14fat">—</div>
+        </div>
+      </div>
+    </div>
+    <div style="position:relative;height:180px;">
+      <canvas id="deficitChart" role="img" aria-label="14-day deficit bar chart">14-day caloric deficit.</canvas>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;">deficit ÷ 7,700 = kg of fat tissue · days without data shown as 0</div>
+  </div>
+
+  <div class="history-card">
+    <div class="section-title">history</div>
+    <div class="history-list" id="historyList">
+      <div class="loading-state">loading your data...</div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────
+const SB_URL  = 'https://zyijbruexbbbidooacmc.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5aWpicnVleGJiYmlkb29hY21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTE0ODAsImV4cCI6MjA5MTUyNzQ4MH0.0F-4JbgdrXSQiDu1Wf8OHb1gh-3ZacrloXHeNejDWmo';
+const TABLE   = 'fitness_log';
+const HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+const PROFILE = { age: 32, heightCm: 175 };
+const SESSION_KCAL = { calisthenics: 280, tennis: 420 };
+const GOALS = [
+  { id:'muscleup',  name:'Muscle-up',   color:'#c8f060', desc:'Pull + transition strength', pct:22 },
+  { id:'handstand', name:'Handstand',   color:'#60c8f0', desc:'Balance & scapular control', pct:35 },
+  { id:'abs',       name:'Visible abs', color:'#f0a060', desc:'Target ~75–76kg', pct:55, weightBased:true },
+  { id:'chest',     name:'Big chest',   color:'#f06090', desc:'Ring dips, archer push-ups', pct:30 }
+];
+
+// Stinson's historical seed weight (pre-app data)
+const SEED_WEIGHT = [
+  ['2025-01-14',83.5],['2025-02-01',81.38],['2025-03-01',79.34],['2025-04-01',77.19],
+  ['2025-05-01',75.78],['2025-06-01',74.38],['2025-07-01',73.14],['2025-07-22',72.22],
+  ['2025-08-07',72.22],['2025-09-01',73.08],['2025-10-01',74.99],['2025-11-01',77.61],
+  ['2025-12-01',79.03],['2026-01-01',80.43],['2026-02-08',82.04],['2026-03-01',80.03],
+  ['2026-04-05',79.28],['2026-04-08',79.31],['2026-04-09',78.8],['2026-04-10',78.8]
+];
+
+let currentUser = null;
+let logs = [];
+let sessionState = { calisthenics: false, tennis: false };
+let wChartInst = null, defChartInst = null, currentView = 'all';
+
+// ── Auth ──────────────────────────────────────────────────────────
+function doLogin() {
+  const val = document.getElementById('loginInput').value.trim().toLowerCase();
+  if (!val) return;
+  currentUser = val;
+  localStorage.setItem('sfl_user', val);
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('headerSub').textContent = val + ' · active cut';
+  document.getElementById('fDate').value = getToday();
+  loadFromSupabase();
+}
+
+function doLogout() {
+  currentUser = null;
+  localStorage.removeItem('sfl_user');
+  logs = [];
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginInput').value = '';
+}
+
+document.getElementById('loginInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// Auto-login if returning user
+const savedUser = localStorage.getItem('sfl_user');
+if (savedUser) {
+  document.getElementById('loginInput').value = savedUser;
+  doLogin();
+}
+
+// ── Supabase API ──────────────────────────────────────────────────
+async function sbFetch(path, method='GET', body=null) {
+  const opts = { method, headers: { ...HEADERS } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(SB_URL + '/rest/v1/' + path, opts);
+  if (method === 'GET') return r.json();
+  return r;
+}
+
+async function loadFromSupabase() {
+  setSyncStatus('loading...', 'loading');
+  try {
+    const data = await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&order=date.asc&select=*`);
+    if (Array.isArray(data)) {
+      logs = data.map(row => ({
+        date: row.date,
+        weight: row.weight_kg,
+        prot: row.protein_g,
+        fat: row.fat_g,
+        carbs: row.carbs_g,
+        cal: row.calories_kcal,
+        steps: row.steps,
+        sedentary: row.sedentary_hrs,
+        sleep: row.sleep_hrs,
+        sessions: { calisthenics: row.calisthenics, tennis: row.tennis },
+        tdee: row.tdee_kcal,
+        deficit: row.deficit_kcal,
+        activity: row.notes || ''
+      }));
+      setSyncStatus('', '');
+      render();
+    }
+  } catch(e) {
+    setSyncStatus('could not connect to database', 'err');
+  }
+}
+
+async function upsertToSupabase(entry) {
+  const row = {
+    username: currentUser,
+    date: entry.date,
+    weight_kg: entry.weight,
+    protein_g: entry.prot,
+    fat_g: entry.fat,
+    carbs_g: entry.carbs,
+    calories_kcal: entry.cal,
+    steps: entry.steps,
+    sedentary_hrs: entry.sedentary,
+    sleep_hrs: entry.sleep,
+    calisthenics: entry.sessions ? entry.sessions.calisthenics : false,
+    tennis: entry.sessions ? entry.sessions.tennis : false,
+    tdee_kcal: entry.tdee,
+    deficit_kcal: entry.deficit,
+    notes: entry.activity || ''
+  };
+  // Remove nulls
+  Object.keys(row).forEach(k => { if (row[k] === null || row[k] === undefined) delete row[k]; });
+
+  const r = await sbFetch(
+    `${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}`,
+    'DELETE'
+  );
+  return sbFetch(TABLE, 'POST', row);
+}
+
+// ── Sync status ───────────────────────────────────────────────────
+function setSyncStatus(msg, type) {
+  const el = document.getElementById('syncStatus');
+  el.textContent = msg;
+  el.className = 'sync-status' + (type ? ' sync-' + type : '');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function getToday() { return new Date().toISOString().slice(0,10); }
+function fmtDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-IE',{day:'numeric',month:'short'}); }
+
+function getAllWeightPoints() {
+  const map = {};
+  // Only seed for Stinson's account
+  if (currentUser === 'stinson') SEED_WEIGHT.forEach(([d,v]) => map[d] = v);
+  logs.forEach(l => { if (l.weight) map[l.date] = l.weight; });
+  return Object.entries(map).sort((a,b) => a[0].localeCompare(b[0]));
+}
+
+function getCurrentWeight() {
+  const pts = getAllWeightPoints();
+  return pts.length ? pts[pts.length-1][1] : 80;
+}
+
+function calcBMR(w) { return 10*w + 6.25*PROFILE.heightCm - 5*PROFILE.age + 5; }
+
+function calcTDEE(wKg, steps, sedHrs, sleepHrs, sessionBonus) {
+  const w = wKg || getCurrentWeight();
+  const sed = (sedHrs != null && !isNaN(sedHrs)) ? sedHrs : 8;
+  const actFactor = Math.max(1.1, 1.2 - Math.max(0, sed-6)*0.01);
+  return Math.round(calcBMR(w)*actFactor + (steps||0)*0.04 + (sessionBonus||0));
+}
+
+function macroKcal(p,f,c) { return Math.round((p||0)*4 + (f||0)*9 + (c||0)*4); }
+
+// ── Session toggles ───────────────────────────────────────────────
+function toggleSession(type) {
+  sessionState[type] = !sessionState[type];
+  const btn = document.getElementById(type==='calisthenics'?'tCalisthenics':'tTennis');
+  const val = document.getElementById(type==='calisthenics'?'tCalisthenicsVal':'tTennisVal');
+  btn.classList.toggle('active', sessionState[type]);
+  val.textContent = sessionState[type] ? '~'+SESSION_KCAL[type]+' kcal added' : 'none today';
+  updatePreview();
+}
+
+// ── Live preview ──────────────────────────────────────────────────
+function updatePreview() {
+  const p=parseFloat(document.getElementById('fProt').value)||0;
+  const f=parseFloat(document.getElementById('fFat').value)||0;
+  const c=parseFloat(document.getElementById('fCarbs').value)||0;
+  const steps=parseFloat(document.getElementById('fSteps').value)||0;
+  const sed=parseFloat(document.getElementById('fSedentary').value);
+  const sleep=parseFloat(document.getElementById('fSleep').value);
+  const wVal=parseFloat(document.getElementById('fWeight').value);
+  const w=isNaN(wVal)?getCurrentWeight():wVal;
+  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0);
+
+  const intake=macroKcal(p,f,c);
+  const tdee=calcTDEE(w,steps,isNaN(sed)?null:sed,isNaN(sleep)?null:sleep,bonus);
+  const deficit=tdee-intake;
+
+  document.getElementById('dpIntake').textContent = intake>0?intake.toLocaleString():'—';
+  document.getElementById('dpTDEE').textContent = tdee.toLocaleString();
+  const parts=[];
+  if(!isNaN(sed)) parts.push(sed+'h desk');
+  if(steps) parts.push((Math.round(steps/100)/10)+'k steps');
+  if(sessionState.calisthenics) parts.push('+'+SESSION_KCAL.calisthenics+' cal');
+  if(sessionState.tennis) parts.push('+'+SESSION_KCAL.tennis+' cal');
+  document.getElementById('dpTDEESub').textContent=parts.length?parts.join(' · '):'BMR + activity';
+
+  const defEl=document.getElementById('dpDeficit'), defSubEl=document.getElementById('dpDeficitSub'), barEl=document.getElementById('deficitBar');
+  if(intake>0){
+    const abs=Math.abs(deficit);
+    defEl.textContent=(deficit>=0?'-':'+')+abs.toLocaleString();
+    defEl.className='dp-val '+(deficit>=200?'c-green':deficit>=0?'c-orange':'c-red');
+    defSubEl.textContent=deficit>=0?'kcal deficit':'kcal surplus';
+    barEl.style.width=Math.min(100,Math.round(abs/tdee*100))+'%';
+    barEl.style.background=(deficit>=300&&deficit<=700)?'#c8f060':deficit>700?'#f0a060':deficit<0?'#f06060':'#60c8f0';
+  } else {
+    defEl.textContent='—'; defEl.className='dp-val c-muted';
+    defSubEl.textContent='enter macros above'; barEl.style.width='0%';
+  }
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function submitEntry() {
+  const date=document.getElementById('fDate').value||getToday();
+  const weight=parseFloat(document.getElementById('fWeight').value)||null;
+  const prot=parseInt(document.getElementById('fProt').value)||null;
+  const fat=parseInt(document.getElementById('fFat').value)||null;
+  const carbs=parseInt(document.getElementById('fCarbs').value)||null;
+  const steps=parseInt(document.getElementById('fSteps').value)||null;
+  const sedRaw=parseFloat(document.getElementById('fSedentary').value);
+  const sleepRaw=parseFloat(document.getElementById('fSleep').value);
+  const sedentary=isNaN(sedRaw)?null:sedRaw;
+  const sleep=isNaN(sleepRaw)?null:sleepRaw;
+  const activity=document.getElementById('fActivity').value.trim();
+
+  if(!weight&&!prot&&!activity){showToast('add at least one value');return;}
+
+  const cal=(prot||fat||carbs)?macroKcal(prot,fat,carbs):null;
+  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0);
+  const tdee=calcTDEE(weight,steps,sedentary,sleep,bonus);
+  const deficit=cal!=null?tdee-cal:null;
+  const sessions={calisthenics:sessionState.calisthenics,tennis:sessionState.tennis};
+  const entry={date,weight,prot,fat,carbs,cal,steps,sedentary,sleep,sessions,tdee,deficit,activity};
+
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='saving...';
+  setSyncStatus('syncing to database...','loading');
+
+  try {
+    await upsertToSupabase(entry);
+    const idx=logs.findIndex(l=>l.date===date);
+    if(idx>=0) logs[idx]=entry; else logs.push(entry);
+    logs.sort((a,b)=>a.date.localeCompare(b.date));
+
+    ['fWeight','fProt','fFat','fCarbs','fSteps','fSedentary','fSleep'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('fActivity').value='';
+    sessionState.calisthenics=false; sessionState.tennis=false;
+    ['tCalisthenics','tTennis'].forEach(id=>document.getElementById(id).classList.remove('active'));
+    document.getElementById('tCalisthenicsVal').textContent='none today';
+    document.getElementById('tTennisVal').textContent='none today';
+    updatePreview();
+    render();
+    setSyncStatus('synced ✓','ok');
+    showToast('entry saved ✓');
+    setTimeout(()=>setSyncStatus('',''),3000);
+  } catch(e) {
+    setSyncStatus('sync failed — check connection','err');
+    showToast('save failed');
+  }
+  btn.disabled=false; btn.textContent='save entry';
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ── Weight chart ──────────────────────────────────────────────────
+function calcPace(pts) {
+  if(pts.length<4) return null;
+  const r=pts.slice(-14);
+  const days=(new Date(r[r.length-1][0])-new Date(r[0][0]))/86400000;
+  if(days<1) return null;
+  return((r[r.length-1][1]-r[0][1])/days)*7;
+}
+
+function buildProjection(pts,weeks) {
+  const pace=calcPace(pts);
+  if(!pace||pace>=0) return [];
+  const last=pts[pts.length-1];
+  const res=[];
+  for(let i=1;i<=weeks*2;i++){
+    const d=new Date(last[0]+'T12:00:00'); d.setDate(d.getDate()+i*3.5);
+    const v=parseFloat((last[1]+pace/7*i*3.5).toFixed(2));
+    if(v<65) break;
+    res.push([d.toISOString().slice(0,10),v]);
+  }
+  return res;
+}
+
+function filterPts(pts,view) {
+  const now=new Date();
+  if(view==='1m'){const c=new Date(now);c.setMonth(c.getMonth()-1);return pts.filter(p=>new Date(p[0])>=c);}
+  if(view==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return pts.filter(p=>new Date(p[0])>=c);}
+  return pts;
+}
+
+function renderWeightChart() {
+  const allPts=getAllWeightPoints();
+  const pts=filterPts(allPts,currentView);
+  const proj=buildProjection(allPts,currentView==='1m'?8:16);
+  const aL=pts.map(p=>fmtDate(p[0])), pL=proj.map(p=>fmtDate(p[0]));
+  const all=[...new Set([...aL,...pL])];
+  const aD=all.map(l=>{const i=aL.indexOf(l);return i>=0?pts[i][1]:null;});
+  const pD=all.map(l=>{const i=pL.indexOf(l);return i>=0?proj[i][1]:null;});
+  const gL=all.map(()=>75.5);
+  if(wChartInst) wChartInst.destroy();
+  wChartInst=new Chart(document.getElementById('wChart'),{
+    type:'line',
+    data:{labels:all,datasets:[
+      {label:'actual',data:aD,borderColor:'#c8f060',borderWidth:2,pointRadius:pts.length>30?0:3,pointHoverRadius:5,pointBackgroundColor:'#c8f060',fill:false,tension:0.3,spanGaps:false},
+      {label:'projected',data:pD,borderColor:'#60c8f0',borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false,tension:0.3,spanGaps:false},
+      {label:'goal',data:gL,borderColor:'rgba(240,160,96,0.35)',borderWidth:1,borderDash:[2,4],pointRadius:0,fill:false}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2022',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b6d72',bodyColor:'#f0f0ee',titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:12},callbacks:{label:ctx=>ctx.parsed.y===null?null:` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} kg`}}},
+      scales:{x:{ticks:{color:'#6b6d72',font:{family:'DM Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}},y:{ticks:{color:'#6b6d72',font:{family:'DM Mono',size:10},callback:v=>v.toFixed(1)},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}}}
+    }
+  });
+}
+
+// ── Deficit chart ─────────────────────────────────────────────────
+function renderDeficitChart() {
+  const today=new Date();
+  const days=[];
+  for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const logMap={};
+  logs.forEach(l=>logMap[l.date]=l);
+  const labels=days.map(d=>fmtDate(d));
+  const data=days.map(d=>{const l=logMap[d];return(l&&l.deficit!=null)?Math.round(l.deficit):0;});
+  const total=data.reduce((s,v)=>s+v,0);
+  const fatG=Math.round(total/7700*1000);
+  const totalEl=document.getElementById('d14total');
+  totalEl.textContent=(total>=0?'-':'+')+Math.abs(total).toLocaleString()+' kcal';
+  totalEl.style.color=total>=0?'var(--accent2)':'var(--red)';
+  document.getElementById('d14fat').textContent=total>0?fatG+' g':'0 g';
+  const bgC=data.map(v=>v>=300?'rgba(200,240,96,0.75)':v>=0?'rgba(96,200,240,0.6)':'rgba(240,96,96,0.7)');
+  const bdC=data.map(v=>v>=300?'#c8f060':v>=0?'#60c8f0':'#f06060');
+  if(defChartInst) defChartInst.destroy();
+  defChartInst=new Chart(document.getElementById('deficitChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'deficit (kcal)',data,backgroundColor:bgC,borderColor:bdC,borderWidth:1,borderRadius:4}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2022',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b6d72',bodyColor:'#f0f0ee',titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:12},callbacks:{label:ctx=>{const v=ctx.parsed.y;return v===0?' no data':` ${v>=0?'-':'+'}${Math.abs(v).toLocaleString()} kcal`;}}}},
+      scales:{x:{ticks:{color:'#6b6d72',font:{family:'DM Mono',size:10},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}},y:{ticks:{color:'#6b6d72',font:{family:'DM Mono',size:10},callback:v=>v.toLocaleString()},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}}}
+    }
+  });
+}
+
+// ── Stats ─────────────────────────────────────────────────────────
+function renderStats() {
+  const allPts=getAllWeightPoints();
+  const latest=allPts[allPts.length-1];
+  if(latest) document.getElementById('currentWeightDisplay').textContent=latest[1].toFixed(1);
+  const avg=(arr,key)=>{const v=arr.filter(l=>l[key]!=null);return v.length?v.reduce((s,l)=>s+l[key],0)/v.length:null;};
+  const r7=logs.slice(-7);
+  const a7cal=avg(r7,'cal'),a7prot=avg(r7,'prot'),a7def=avg(r7,'deficit');
+  document.getElementById('s7kcal').textContent=a7cal!=null?Math.round(a7cal).toLocaleString():'—';
+  document.getElementById('s7prot').textContent=a7prot!=null?Math.round(a7prot)+'g':'—';
+  const defEl=document.getElementById('s7deficit');
+  if(a7def!=null){defEl.textContent=(a7def>=0?'-':'+')+Math.abs(Math.round(a7def)).toLocaleString();defEl.className='stat-val '+(a7def>=200?'c-green':a7def>=0?'c-orange':'c-red');}
+  else{defEl.textContent='—';defEl.className='stat-val c-muted';}
+  const pace=calcPace(allPts);
+  const pEl=document.getElementById('sPace');
+  if(pace!=null){pEl.textContent=pace.toFixed(2);pEl.className='stat-val '+(pace<-0.5?'c-green':pace<0?'c-orange':'c-red');}
+  else{pEl.textContent='—';pEl.className='stat-val c-muted';}
+}
+
+// ── Goals ─────────────────────────────────────────────────────────
+function renderGoals() {
+  const cw=getCurrentWeight(),sw=83.5,at=75.5;
+  document.getElementById('goalsGrid').innerHTML=GOALS.map(g=>{
+    let pct=g.pct,status=g.desc;
+    if(g.weightBased){pct=Math.min(100,Math.round(((sw-cw)/(sw-at))*100));const rem=(cw-at).toFixed(1);status=rem>0?rem+'kg to go':'achieved!';}
+    pct=Math.max(0,Math.min(100,pct));
+    return `<div class="goal-item"><div class="goal-name"><div class="goal-icon" style="background:${g.color}"></div>${g.name}</div><div class="goal-bar-bg"><div class="goal-bar" style="width:${pct}%;background:${g.color}"></div></div><div class="goal-status">${pct}% · ${status}</div></div>`;
+  }).join('');
+}
+
+// ── History ───────────────────────────────────────────────────────
+function renderHistory() {
+  const list=document.getElementById('historyList');
+  if(!logs.length){list.innerHTML='<div class="empty-state">no entries yet — log your first day above</div>';return;}
+  list.innerHTML=[...logs].reverse().slice(0,30).map(l=>{
+    const hasCal=l.sessions&&l.sessions.calisthenics,hasTen=l.sessions&&l.sessions.tennis;
+    const sClass=hasCal&&hasTen?'s-both':hasCal?'s-calisthenics':hasTen?'s-tennis':'';
+    const defStr=l.deficit!=null?`<span class="${l.deficit>=0?'deficit-pos':'deficit-neg'}">${l.deficit>=0?'-':'+'}${Math.abs(Math.round(l.deficit)).toLocaleString()} kcal</span>`:'';
+    const extras=[l.steps?(Math.round(l.steps/100)/10)+'k steps':'',l.sedentary!=null?l.sedentary+'h desk':'',l.sleep!=null?l.sleep+'h sleep':'',hasCal?'calisthenics':'',hasTen?'tennis':''].filter(Boolean).join(' · ');
+    return `<div class="entry ${sClass}">
+      <div class="entry-top">
+        <div class="entry-date">${fmtDate(l.date)}</div>
+        <div class="entry-weight">${l.weight?l.weight.toFixed(1)+'kg':'—'}</div>
+        <div class="entry-macros">
+          <div class="em"><div class="em-val c-blue">${l.cal?l.cal.toLocaleString():'—'}</div><div class="em-label">kcal</div></div>
+          <div class="em"><div class="em-val c-green">${l.prot?l.prot+'g':'—'}</div><div class="em-label">prot</div></div>
+          <div class="em"><div class="em-val c-orange">${l.fat?l.fat+'g':'—'}</div><div class="em-label">fat</div></div>
+          <div class="em"><div class="em-val">${l.carbs?l.carbs+'g':'—'}</div><div class="em-label">carbs</div></div>
+          ${l.tdee?`<div class="em"><div class="em-val c-pink">${l.tdee.toLocaleString()}</div><div class="em-label">tdee</div></div>`:''}
+        </div>
+      </div>
+      <div class="entry-bottom">${defStr}${extras?`<span>${extras}</span>`:''}${l.activity?`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.activity}</span>`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+function render() { renderStats(); renderWeightChart(); renderDeficitChart(); renderGoals(); renderHistory(); }
+function setView(v,btn) { document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); currentView=v; renderWeightChart(); }
+</script>
+</body>
+</html>
