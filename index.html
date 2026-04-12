@@ -166,6 +166,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .pin-dot{width:13px;height:13px;border-radius:50%;background:var(--border2);transition:background 0.15s;}
 .pin-dot.filled{background:var(--accent);}
 
+/* ── Settings panel ── */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;display:none;align-items:flex-start;justify-content:flex-end;}
+.settings-overlay.open{display:flex;}
+.settings-panel{background:var(--surface);border-left:1px solid var(--border2);width:100%;max-width:380px;height:100vh;overflow-y:auto;padding:2rem 1.5rem 3rem;animation:slideIn 0.2s ease;}
+@keyframes slideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+.settings-title{font-family:var(--mono);font-size:16px;font-weight:500;margin-bottom:0.25rem;}
+.settings-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:1.5rem;}
+.settings-section{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:1.25rem 0 0.75rem;padding-top:1.25rem;border-top:1px solid var(--border);}
+.settings-section:first-of-type{margin-top:0;padding-top:0;border-top:none;}
+.save-btn{width:100%;background:var(--accent);color:#0e0f11;border:none;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;padding:11px;cursor:pointer;transition:opacity 0.15s;margin-top:1rem;}
+.save-btn:hover{opacity:0.88;}
+.save-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.settings-status{font-family:var(--mono);font-size:11px;text-align:center;padding:6px;min-height:16px;color:var(--accent);}
+.close-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;float:right;margin-top:-4px;}
+
 @media(max-width:600px){
   .stat-row{grid-template-columns:repeat(2,1fr);}
   .goals-grid{grid-template-columns:1fr;}
@@ -301,6 +316,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
         <div class="num" id="currentWeightDisplay">—</div>
         <div class="label">kg · latest</div>
       </div>
+      <button class="hdr-btn" onclick="openSettings()">⚙ settings</button>
       <button class="hdr-btn" onclick="doLogout()">← switch user</button>
     </div>
   </div>
@@ -411,6 +427,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
   </div>
 
 </div>
+<!-- ── SETTINGS PANEL ── -->
+<div class="settings-overlay" id="settingsOverlay" onclick="handleOverlayClick(event)">
+  <div class="settings-panel" id="settingsPanel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+      <div class="settings-title">settings</div>
+      <button class="close-btn" onclick="closeSettings()">×</button>
+    </div>
+    <div class="settings-sub" id="settingsSub">update your profile and goals</div>
+
+    <div class="settings-section">profile</div>
+    <div class="fi-row" style="margin-bottom:0">
+      <div><label class="fl">age</label><input class="fi" type="number" id="sAge" min="16" max="80"></div>
+      <div><label class="fl">gender</label>
+        <select class="fi fi-select" id="sGender">
+          <option value="male">male</option>
+          <option value="female">female</option>
+        </select>
+      </div>
+    </div>
+    <div class="fi-row" style="margin-bottom:0">
+      <div><label class="fl">height (cm)</label><input class="fi" type="number" id="sHeight" min="100" max="250"></div>
+      <div><label class="fl">starting weight (kg)</label><input class="fi" type="number" id="sStartWeight" step="0.1" min="30" max="300"></div>
+    </div>
+
+    <div class="settings-section">goals</div>
+    <div class="goals-picker" id="settingsGoalsPicker">
+      <div class="goal-pill" data-goal="Muscle-up" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Muscle-up</div>
+      <div class="goal-pill" data-goal="Handstand" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Handstand</div>
+      <div class="goal-pill" data-goal="Visible abs" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Visible abs</div>
+      <div class="goal-pill" data-goal="Big chest" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Big chest</div>
+      <div class="goal-pill" data-goal="Lose weight" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Lose weight</div>
+      <div class="goal-pill" data-goal="Build muscle" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Build muscle</div>
+      <div class="goal-pill" data-goal="Improve cardio" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Improve cardio</div>
+      <div class="goal-pill" data-goal="Flexibility" onclick="toggleSettingsGoal(this)"><div class="gp-dot"></div>Flexibility</div>
+    </div>
+
+    <div class="settings-section">change PIN</div>
+    <label class="fl">new PIN (4 digits)</label>
+    <input class="fi" type="password" id="sPin1" placeholder="leave blank to keep current" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password">
+    <label class="fl">confirm new PIN</label>
+    <input class="fi" type="password" id="sPin2" placeholder="repeat new PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password">
+    <div class="fi-hint err" id="sPinError" style="text-align:center;min-height:14px;"></div>
+
+    <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">save changes</button>
+    <div class="settings-status" id="settingsStatus"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -745,6 +809,95 @@ function doLogout(){
   localStorage.removeItem('sfl_user');
   document.getElementById('loginInput').value='';
   show('screenLogin');
+}
+
+// ── Settings panel ────────────────────────────────────────────────
+let settingsGoals=[];
+
+function openSettings(){
+  const p=getProfile();
+  // Pre-populate fields with current profile
+  document.getElementById('sAge').value=p.age||'';
+  document.getElementById('sGender').value=p.gender||'male';
+  document.getElementById('sHeight').value=p.height_cm||'';
+  document.getElementById('sStartWeight').value=p.start_weight_kg||'';
+  document.getElementById('sPin1').value='';
+  document.getElementById('sPin2').value='';
+  document.getElementById('sPinError').textContent='';
+  document.getElementById('settingsStatus').textContent='';
+  document.getElementById('settingsSub').textContent=currentUser+' · update your profile and goals';
+  // Restore goals selection
+  settingsGoals=p.goals?p.goals.split(',').filter(Boolean):[];
+  document.querySelectorAll('#settingsGoalsPicker .goal-pill').forEach(el=>{
+    const selected=settingsGoals.includes(el.dataset.goal);
+    el.classList.toggle('selected',selected);
+  });
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+
+function closeSettings(){
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e){
+  if(e.target===document.getElementById('settingsOverlay')) closeSettings();
+}
+
+function toggleSettingsGoal(el){
+  const g=el.dataset.goal;
+  if(el.classList.contains('selected')){
+    el.classList.remove('selected');
+    settingsGoals=settingsGoals.filter(x=>x!==g);
+  } else {
+    if(settingsGoals.length>=4){showToast('max 4 goals');return;}
+    el.classList.add('selected');
+    settingsGoals.push(g);
+  }
+}
+
+async function saveSettings(){
+  const btn=document.getElementById('saveSettingsBtn');
+  const statusEl=document.getElementById('settingsStatus');
+  const errEl=document.getElementById('sPinError');
+  errEl.textContent='';statusEl.textContent='';
+
+  // Validate PIN if provided
+  const p1=document.getElementById('sPin1').value.trim();
+  const p2=document.getElementById('sPin2').value.trim();
+  let newPinHash=null;
+  if(p1||p2){
+    if(p1.length!==4||!/^\d{4}$/.test(p1)){errEl.textContent='PIN must be exactly 4 digits';return;}
+    if(p1!==p2){errEl.textContent='PINs do not match';return;}
+    newPinHash=await hashPIN(p1);
+  }
+
+  btn.disabled=true;btn.textContent='saving...';
+
+  const updated={
+    ...userProfile,
+    age:parseInt(document.getElementById('sAge').value)||userProfile.age,
+    gender:document.getElementById('sGender').value,
+    height_cm:parseInt(document.getElementById('sHeight').value)||userProfile.height_cm,
+    start_weight_kg:parseFloat(document.getElementById('sStartWeight').value)||userProfile.start_weight_kg,
+    goals:settingsGoals.join(',')
+  };
+  if(newPinHash) updated.pin_hash=newPinHash;
+
+  try{
+    // Upsert profile — delete then re-insert
+    await sbFetch(`user_profiles?username=eq.${encodeURIComponent(currentUser)}`,'DELETE');
+    await sbFetch('user_profiles','POST',updated);
+    userProfile=updated;
+    updateHeaderSub();
+    render();
+    statusEl.textContent='saved ✓';
+    showToast('profile updated ✓');
+    setTimeout(()=>{statusEl.textContent='';},2500);
+  } catch(e){
+    statusEl.style.color='var(--red)';
+    statusEl.textContent='save failed — check connection';
+  }
+  btn.disabled=false;btn.textContent='save changes';
 }
 
 // ── Session toggles ───────────────────────────────────────────────
