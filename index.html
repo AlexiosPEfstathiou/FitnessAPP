@@ -722,13 +722,40 @@ async function loadFromSupabase(){
 }
 
 async function upsertToSupabase(entry){
+  // Fetch any existing entry for this date so we can merge, not overwrite
+  let existing={};
+  try{
+    const prev=await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}&select=*`);
+    if(Array.isArray(prev)&&prev.length>0) existing=prev[0];
+  } catch(e){}
+
+  // Build new row — new values take priority; fall back to existing where new value is null/undefined
+  const pick=(newVal,oldKey)=>(newVal!=null&&newVal!==undefined)?newVal:(existing[oldKey]??null);
+
   const row={
-    username:currentUser,date:entry.date,weight_kg:entry.weight,protein_g:entry.prot,fat_g:entry.fat,
-    carbs_g:entry.carbs,calories_kcal:entry.cal,steps:entry.steps,sedentary_hrs:entry.sedentary,
-    sleep_hrs:entry.sleep,calisthenics:entry.sessions?entry.sessions.calisthenics:false,
-    tennis:entry.sessions?entry.sessions.tennis:false,tdee_kcal:entry.tdee,deficit_kcal:entry.deficit,notes:entry.activity||''
+    username:currentUser,
+    date:entry.date,
+    weight_kg:       pick(entry.weight,       'weight_kg'),
+    protein_g:       pick(entry.prot,         'protein_g'),
+    fat_g:           pick(entry.fat,           'fat_g'),
+    carbs_g:         pick(entry.carbs,         'carbs_g'),
+    calories_kcal:   pick(entry.cal,           'calories_kcal'),
+    steps:           pick(entry.steps,         'steps'),
+    sedentary_hrs:   pick(entry.sedentary,     'sedentary_hrs'),
+    sleep_hrs:       pick(entry.sleep,         'sleep_hrs'),
+    calisthenics:    entry.sessions?entry.sessions.calisthenics:(existing.calisthenics??false),
+    tennis:          entry.sessions?entry.sessions.tennis:(existing.tennis??false),
+    tdee_kcal:       pick(entry.tdee,          'tdee_kcal'),
+    deficit_kcal:    pick(entry.deficit,       'deficit_kcal'),
+    notes:           (entry.activity&&entry.activity.trim())?entry.activity:(existing.notes||'')
   };
+
+  // Recompute deficit if we now have both cal and tdee from merged data
+  if(row.calories_kcal&&row.tdee_kcal) row.deficit_kcal=row.tdee_kcal-row.calories_kcal;
+
+  // Remove nulls before sending
   Object.keys(row).forEach(k=>{if(row[k]===null||row[k]===undefined)delete row[k];});
+
   await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}`,'DELETE');
   return sbFetch(TABLE,'POST',row);
 }
@@ -969,8 +996,25 @@ async function submitEntry(){
   setSyncStatus('syncing...','loading');
   try{
     await upsertToSupabase(entry);
+    // Merge with existing in-memory entry for this date so UI reflects the full merged record
     const idx=logs.findIndex(l=>l.date===date);
-    if(idx>=0) logs[idx]=entry; else logs.push(entry);
+    const prev=idx>=0?logs[idx]:{};
+    const mergedEntry={
+      date,
+      weight:     weight    ??prev.weight,
+      prot:       prot      ??prev.prot,
+      fat:        fat       ??prev.fat,
+      carbs:      carbs     ??prev.carbs,
+      cal:        cal       ??prev.cal,
+      steps:      steps     ??prev.steps,
+      sedentary:  sedentary ??prev.sedentary,
+      sleep:      sleep     ??prev.sleep,
+      sessions,
+      tdee,
+      deficit:    (cal??prev.cal)!=null ? tdee-(cal??prev.cal) : null,
+      activity:   activity||(prev.activity||'')
+    };
+    if(idx>=0) logs[idx]=mergedEntry; else logs.push(mergedEntry);
     logs.sort((a,b)=>a.date.localeCompare(b.date));
     ['fWeight','fProt','fFat','fCarbs','fSteps','fSedentary','fSleep'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fActivity').value='';
