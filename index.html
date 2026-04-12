@@ -410,7 +410,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
       <div class="accuracy-pill" id="accuracyPill">—</div>
       <div class="accuracy-detail" id="accuracyDetail"></div>
     </div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;">deficit ÷ 7,700 = kg of fat tissue · days without data shown as 0</div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;align-items:center;">
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:10px;height:10px;border-radius:2px;background:#c8f060;flex-shrink:0;"></div>good deficit (300–700 kcal)
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:10px;height:10px;border-radius:2px;background:#60c8f0;flex-shrink:0;"></div>small deficit (0–299 kcal)
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:10px;height:10px;border-radius:2px;background:#f0a060;flex-shrink:0;"></div>aggressive deficit (700+ kcal)
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:10px;height:10px;border-radius:2px;background:#f06060;flex-shrink:0;"></div>surplus / over target
+      </div>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px;">deficit ÷ 7,700 = kg of fat tissue · days without data shown as 0</div>
   </div>
 
   <div class="history-card">
@@ -422,7 +436,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
         <input type="file" id="inAppImportFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="importInApp(this.files[0])">
       </div>
     </div>
-    <div class="import-inline-status" id="inlineImportStatus" style="font-family:var(--mono);font-size:11px;color:var(--accent);padding:6px 0;min-height:0;display:none;"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:3px;height:16px;border-radius:1px;background:#f06060;flex-shrink:0;"></div>calisthenics session
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:3px;height:16px;border-radius:1px;background:#60c8f0;flex-shrink:0;"></div>tennis session
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:3px;height:16px;border-radius:1px;background:#a060f0;flex-shrink:0;"></div>both sessions
+      </div>
+    </div> style="font-family:var(--mono);font-size:11px;color:var(--accent);padding:6px 0;min-height:0;display:none;"></div>
     <div class="history-list" id="historyList"><div class="loading-state">loading your data...</div></div>
   </div>
 
