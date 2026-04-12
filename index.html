@@ -400,8 +400,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
   <div class="history-card">
     <div class="history-header">
       <div class="section-title" style="margin-bottom:0">history</div>
-      <button class="export-btn" onclick="exportXLSX()">export .xlsx</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="export-btn" onclick="triggerInAppImport()">import .csv/.xlsx</button>
+        <button class="export-btn" onclick="exportXLSX()">export .xlsx</button>
+        <input type="file" id="inAppImportFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="importInApp(this.files[0])">
+      </div>
     </div>
+    <div class="import-inline-status" id="inlineImportStatus" style="font-family:var(--mono);font-size:11px;color:var(--accent);padding:6px 0;min-height:0;display:none;"></div>
     <div class="history-list" id="historyList"><div class="loading-state">loading your data...</div></div>
   </div>
 
@@ -846,7 +851,57 @@ function exportXLSX(){
   showToast('exported ✓');
 }
 
-// ── Weight chart ──────────────────────────────────────────────────
+// ── In-app import ─────────────────────────────────────────────────
+function triggerInAppImport(){
+  document.getElementById('inAppImportFile').value='';
+  document.getElementById('inAppImportFile').click();
+}
+
+function importInApp(file){
+  if(!file) return;
+  const statusEl=document.getElementById('inlineImportStatus');
+  statusEl.style.display='block';
+  statusEl.style.color='var(--muted)';
+  statusEl.textContent='reading file...';
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(sheet,{defval:''});
+      const rows=[];
+      raw.forEach(r=>{
+        const dateRaw=r['Date']||r['date']||r['DATE']||'';
+        const d=parseDate(String(dateRaw));
+        if(!d) return;
+        const cal=toNum(r['Calories (kcal)']||r['Calories']||r['calories']||r['Energy (kcal)']||r['Energy']||0);
+        const prot=toNum(r['Protein (g)']||r['Protein']||r['protein']||0);
+        const fat=toNum(r['Fat (g)']||r['Fat']||r['fat']||0);
+        const carbs=toNum(r['Carbs (g)']||r['Carbohydrates (g)']||r['Carbs']||r['carbs']||0);
+        const wt=toNum(r['Trend Weight (kg)']||r['Weight (kg)']||r['Weight']||r['weight']||0)||null;
+        const derivedCal=cal||(prot||fat||carbs?Math.round(prot*4+fat*9+carbs*4):0);
+        rows.push({date:d,weight_kg:wt,protein_g:prot||null,fat_g:fat||null,carbs_g:carbs||null,calories_kcal:derivedCal||null,calisthenics:false,tennis:false});
+      });
+      if(!rows.length){statusEl.style.color='var(--red)';statusEl.textContent='no recognisable data found — check column names';return;}
+      statusEl.textContent=`uploading ${rows.length} rows...`;
+      let ok=0;
+      for(const row of rows){
+        try{
+          await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${row.date}`,'DELETE');
+          await sbFetch(TABLE,'POST',{...row,username:currentUser});
+          ok++;
+        } catch(e){}
+      }
+      statusEl.style.color='var(--accent)';
+      statusEl.textContent=`imported ${ok} of ${rows.length} entries ✓ — reloading...`;
+      setTimeout(()=>{statusEl.style.display='none';loadFromSupabase();},1800);
+    } catch(ex){
+      statusEl.style.color='var(--red)';
+      statusEl.textContent='could not parse file: '+ex.message;
+    }
+  };
+  reader.readAsBinaryString(file);
+}
 function calcPace(pts){
   if(pts.length<4) return null;
   const r=pts.slice(-14);
