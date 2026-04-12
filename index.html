@@ -1212,8 +1212,8 @@ function renderDeficitChart(){
     accRow.style.display='none';
   }
 
-  const bgC=data.map(v=>v>=300?'rgba(200,240,96,0.75)':v>=0?'rgba(96,200,240,0.6)':'rgba(240,96,96,0.7)');
-  const bdC=data.map(v=>v>=300?'#c8f060':v>=0?'#60c8f0':'#f06060');
+  const bgC=data.map(v=>v>700?'rgba(240,160,96,0.75)':v>=300?'rgba(200,240,96,0.75)':v>=0?'rgba(96,200,240,0.6)':'rgba(240,96,96,0.7)');
+  const bdC=data.map(v=>v>700?'#f0a060':v>=300?'#c8f060':v>=0?'#60c8f0':'#f06060');
   if(defChartInst) defChartInst.destroy();
   defChartInst=new Chart(document.getElementById('deficitChart'),{
     type:'bar',
