@@ -789,13 +789,13 @@ async function loadFromSupabase(){
 }
 
 async function sbUpsert(table, row){
-  // Use Supabase's native upsert — atomic, no race condition
+  const conflictCol = table === TABLE ? 'username,date' : 'username';
   const opts={method:'POST',headers:{
     ...HDRS,
     'Prefer':'resolution=merge-duplicates,return=minimal'
   }};
   opts.body=JSON.stringify(row);
-  const r=await fetch(SB_URL+'/rest/v1/'+table,opts);
+  const r=await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${conflictCol}`,opts);
   return r;
 }
 
