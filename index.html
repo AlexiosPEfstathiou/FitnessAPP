@@ -419,6 +419,7 @@ body.dark-mode textarea::placeholder {
     </div>
     <button class="submit-btn" id="submitBtn" onclick="submitEntry()">save entry</button>
     <div class="sync-status" id="syncStatus"></div>
+    <div id="syncDiag" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;line-height:1.6;word-break:break-all;display:none;"></div>
   </div>
 
   <!-- 14-day deficit chart -->
@@ -676,16 +677,15 @@ async function finishOnboard(){
   document.getElementById('importBtn').textContent='saving...';
   // Save profile
   try{
-    await sbFetch('user_profiles','POST',userProfile);
-  } catch(e){ /* table may not exist, continue anyway */ }
+    await sbUpsert('user_profiles',userProfile);
+  } catch(e){ /* continue anyway */ }
   // Bulk import if any rows parsed
   if(importedRows.length>0){
     document.getElementById('importStatus').textContent=`importing ${importedRows.length} rows...`;
     let ok=0;
     for(const row of importedRows){
       try{
-        await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${row.date}`,'DELETE');
-        await sbFetch(TABLE,'POST',{...row,username:currentUser});
+        await sbUpsert(TABLE,{...row,username:currentUser});
         ok++;
       }catch(e){}
     }
@@ -788,6 +788,17 @@ async function loadFromSupabase(){
   } catch(e){setSyncStatus('could not connect','err');}
 }
 
+async function sbUpsert(table, row){
+  // Use Supabase's native upsert — atomic, no race condition
+  const opts={method:'POST',headers:{
+    ...HDRS,
+    'Prefer':'resolution=merge-duplicates,return=minimal'
+  }};
+  opts.body=JSON.stringify(row);
+  const r=await fetch(SB_URL+'/rest/v1/'+table,opts);
+  return r;
+}
+
 async function upsertToSupabase(entry){
   // Fetch any existing entry for this date so we can merge, not overwrite
   let existing={};
@@ -797,7 +808,6 @@ async function upsertToSupabase(entry){
     else if(prev&&prev.code){ console.warn('[sfl] merge fetch error:',prev); }
   } catch(e){ console.warn('[sfl] merge fetch threw:',e); }
 
-  // Build new row — new values take priority; fall back to existing where new value is null/undefined
   const pick=(newVal,oldKey)=>(newVal!=null&&newVal!==undefined)?newVal:(existing[oldKey]??null);
 
   const row={
@@ -818,26 +828,25 @@ async function upsertToSupabase(entry){
     notes:           (entry.activity&&entry.activity.trim())?entry.activity:(existing.notes||'')
   };
 
-  // Recompute deficit if we now have both cal and tdee from merged data
   if(row.calories_kcal&&row.tdee_kcal) row.deficit_kcal=row.tdee_kcal-row.calories_kcal;
-
-  // Remove nulls before sending
   Object.keys(row).forEach(k=>{if(row[k]===null||row[k]===undefined)delete row[k];});
 
   console.log('[sfl] upserting row for',entry.date,row);
+  const diag=document.getElementById('syncDiag');
+  if(diag){diag.style.display='block';diag.textContent='sending to supabase...';}
 
-  const delRes=await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}`,'DELETE');
-  console.log('[sfl] DELETE status:',delRes?.status);
+  const upsertRes=await sbUpsert(TABLE,row);
+  const status=upsertRes?.status||'?';
+  console.log('[sfl] UPSERT status:',status);
 
-  const postRes=await sbFetch(TABLE,'POST',row);
-  console.log('[sfl] POST status:',postRes?.status);
-
-  if(postRes&&!postRes.ok){
-    const errText=await postRes.text().catch(()=>'unknown error');
-    console.error('[sfl] POST failed:',errText);
-    throw new Error(`save failed (${postRes.status}): ${errText}`);
+  if(upsertRes&&!upsertRes.ok){
+    const errText=await upsertRes.text().catch(()=>'unknown error');
+    console.error('[sfl] UPSERT failed:',errText);
+    if(diag) diag.textContent=`UPSERT ${status} · error: ${errText}`;
+    throw new Error(`save failed (${status}): ${errText}`);
   }
-  return postRes;
+  if(diag) diag.textContent=`UPSERT ${status} · ok`;
+  return upsertRes;
 }
 
 function setSyncStatus(msg,type){
@@ -1007,9 +1016,7 @@ async function saveSettings(){
   if(newPinHash) updated.pin_hash=newPinHash;
 
   try{
-    // Upsert profile — delete then re-insert
-    await sbFetch(`user_profiles?username=eq.${encodeURIComponent(currentUser)}`,'DELETE');
-    await sbFetch('user_profiles','POST',updated);
+    await sbUpsert('user_profiles',updated);
     userProfile=updated;
     updateHeaderSub();
     render();
@@ -1184,8 +1191,7 @@ function importInApp(file){
       let ok=0;
       for(const row of rows){
         try{
-          await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${row.date}`,'DELETE');
-          await sbFetch(TABLE,'POST',{...row,username:currentUser});
+          await sbUpsert(TABLE,{...row,username:currentUser});
           ok++;
         } catch(e){}
       }
@@ -1336,9 +1342,7 @@ function renderDeficitChart(){
 
     // Persist correction factor silently to Supabase (fire and forget)
     if(userProfile&&userProfile.tdee_correction){
-      sbFetch(`user_profiles?username=eq.${encodeURIComponent(currentUser)}`,'DELETE')
-        .then(()=>sbFetch('user_profiles','POST',userProfile))
-        .catch(()=>{});
+      sbUpsert('user_profiles',userProfile).catch(()=>{});
     }
 
   } else {
