@@ -794,7 +794,8 @@ async function upsertToSupabase(entry){
   try{
     const prev=await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}&select=*`);
     if(Array.isArray(prev)&&prev.length>0) existing=prev[0];
-  } catch(e){}
+    else if(prev&&prev.code){ console.warn('[sfl] merge fetch error:',prev); }
+  } catch(e){ console.warn('[sfl] merge fetch threw:',e); }
 
   // Build new row — new values take priority; fall back to existing where new value is null/undefined
   const pick=(newVal,oldKey)=>(newVal!=null&&newVal!==undefined)?newVal:(existing[oldKey]??null);
@@ -823,8 +824,20 @@ async function upsertToSupabase(entry){
   // Remove nulls before sending
   Object.keys(row).forEach(k=>{if(row[k]===null||row[k]===undefined)delete row[k];});
 
-  await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}`,'DELETE');
-  return sbFetch(TABLE,'POST',row);
+  console.log('[sfl] upserting row for',entry.date,row);
+
+  const delRes=await sbFetch(`${TABLE}?username=eq.${encodeURIComponent(currentUser)}&date=eq.${entry.date}`,'DELETE');
+  console.log('[sfl] DELETE status:',delRes?.status);
+
+  const postRes=await sbFetch(TABLE,'POST',row);
+  console.log('[sfl] POST status:',postRes?.status);
+
+  if(postRes&&!postRes.ok){
+    const errText=await postRes.text().catch(()=>'unknown error');
+    console.error('[sfl] POST failed:',errText);
+    throw new Error(`save failed (${postRes.status}): ${errText}`);
+  }
+  return postRes;
 }
 
 function setSyncStatus(msg,type){
@@ -833,7 +846,13 @@ function setSyncStatus(msg,type){
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
-function getToday(){return new Date().toISOString().slice(0,10);}
+function getToday(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,'0');
+  const d=String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
 function fmtDate(d){
   const dt=new Date(d+'T12:00:00');
   const day=dt.toLocaleDateString('en-IE',{day:'numeric',month:'short'});
@@ -1102,7 +1121,11 @@ async function submitEntry(){
     updatePreview();render();
     setSyncStatus('synced ✓','ok');showToast('entry saved ✓');
     setTimeout(()=>setSyncStatus('',''),3000);
-  } catch(e){setSyncStatus('sync failed','err');showToast('save failed');}
+  } catch(e){
+    const msg=e&&e.message?e.message:'check connection';
+    setSyncStatus('sync failed — '+msg,'err');
+    showToast('save failed');
+  }
   btn.disabled=false;btn.textContent='save entry';
 }
 
