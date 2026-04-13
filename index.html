@@ -1266,8 +1266,14 @@ function renderWeightChart(){
 
 // ── Deficit chart + accuracy ──────────────────────────────────────
 function renderDeficitChart(){
-  const today=new Date();const days=[];
-  for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const nowLocal=new Date();
+  const todayLocal=`${nowLocal.getFullYear()}-${String(nowLocal.getMonth()+1).padStart(2,'0')}-${String(nowLocal.getDate()).padStart(2,'0')}`;
+  const days=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(nowLocal);
+    d.setDate(d.getDate()-i);
+    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
   const logMap={};logs.forEach(l=>logMap[l.date]=l);
   const labels=days.map(d=>fmtDate(d));
   const data=days.map(d=>{const l=logMap[d];return(l&&l.deficit!=null)?Math.round(l.deficit):0;});
