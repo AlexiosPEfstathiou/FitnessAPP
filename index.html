@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SFL v1.1</title>
+<title>SFL v1.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;1,8..60,300;1,8..60,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -230,7 +230,7 @@ body.dark-mode textarea::placeholder {
 <div class="screen" id="screenLogin">
   <div class="card-center">
     <div class="logo">SFL</div>
-    <div class="sub">v1.1 · fitness log</div>
+    <div class="sub">v1.2 · fitness log</div>
     <div class="stepper"><div class="step-dot active"></div><div class="step-dot"></div><div class="step-dot"></div></div>
     <label class="fl">username</label>
     <input class="fi" type="text" id="loginInput" placeholder="e.g. stinson" autocomplete="username" autocapitalize="none" spellcheck="false">
@@ -341,7 +341,7 @@ body.dark-mode textarea::placeholder {
 
   <div class="header">
     <div class="header-left">
-      <h1>SFL <span style="font-family:var(--mono);font-size:13px;font-weight:400;font-style:normal;color:var(--muted);letter-spacing:0.04em;vertical-align:middle;">v1.1</span></h1>
+      <h1>SFL <span style="font-family:var(--mono);font-size:13px;font-weight:400;font-style:normal;color:var(--muted);letter-spacing:0.04em;vertical-align:middle;">v1.2</span></h1>
       <p id="headerSub">loading...</p>
     </div>
     <div class="header-right">
@@ -403,6 +403,9 @@ body.dark-mode textarea::placeholder {
       </button>
       <button type="button" class="toggle-btn" id="tTennis" onclick="toggleSession('tennis')">
         <span class="tb-label">Tennis session</span><span class="tb-val" id="tTennisVal">none today</span>
+      </button>
+      <button type="button" class="toggle-btn" id="tStretching" onclick="toggleSession('stretching')">
+        <span class="tb-label">Stretching session</span><span class="tb-val" id="tStretchingVal">none today</span>
       </button>
     </div>
     <div class="deficit-preview">
@@ -489,6 +492,9 @@ body.dark-mode textarea::placeholder {
       <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
         <div style="width:3px;height:16px;border-radius:0;background:#7a4a8a;flex-shrink:0;"></div>both sessions
       </div>
+      <div style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div style="width:5px;height:5px;border-radius:50%;background:#6a4f2d;flex-shrink:0;"></div>stretching noted in extras
+      </div>
     </div>
     <div id="inlineImportStatus" style="font-family:var(--mono);font-size:11px;color:var(--accent);padding:6px 0;min-height:0;display:none;"></div>
     <div class="history-list" id="historyList"><div class="loading-state">loading your data...</div></div>
@@ -547,11 +553,11 @@ body.dark-mode textarea::placeholder {
 
 <script>
 const SB_URL='https://zyijbruexbbbidooacmc.supabase.co';
-const VERSION='1.1';
+const VERSION='1.2';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5aWpicnVleGJiYmlkb29hY21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NTE0ODAsImV4cCI6MjA5MTUyNzQ4MH0.0F-4JbgdrXSQiDu1Wf8OHb1gh-3ZacrloXHeNejDWmo';
 const TABLE='fitness_log';
 const HDRS={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'};
-const SESSION_KCAL={calisthenics:280,tennis:420};
+const SESSION_KCAL={calisthenics:280,tennis:420,stretching:120};
 
 const STINSON_SEED=[
   ['2025-01-14',83.5],['2025-02-01',81.38],['2025-03-01',79.34],['2025-04-01',77.19],
@@ -562,7 +568,7 @@ const STINSON_SEED=[
 ];
 
 let currentUser=null, userProfile=null, logs=[], importedRows=[];
-let sessionState={calisthenics:false,tennis:false};
+let sessionState={calisthenics:false,tennis:false,stretching:false};
 let wChartInst=null, defChartInst=null, currentView='all';
 let selectedGoals=[];
 
@@ -779,7 +785,7 @@ async function loadFromSupabase(){
       logs=data.map(row=>({
         date:row.date,weight:row.weight_kg,prot:row.protein_g,fat:row.fat_g,carbs:row.carbs_g,
         cal:row.calories_kcal,steps:row.steps,sedentary:row.sedentary_hrs,sleep:row.sleep_hrs,
-        sessions:{calisthenics:row.calisthenics,tennis:row.tennis},
+        sessions:{calisthenics:row.calisthenics,tennis:row.tennis,stretching:row.stretching||false},
         tdee:row.tdee_kcal,deficit:row.deficit_kcal,activity:row.notes||''
       }));
       setSyncStatus('','');
@@ -824,6 +830,7 @@ async function upsertToSupabase(entry){
     sleep_hrs:       pick(entry.sleep,         'sleep_hrs'),
     calisthenics:    entry.sessions?entry.sessions.calisthenics:(existing.calisthenics??false),
     tennis:          entry.sessions?entry.sessions.tennis:(existing.tennis??false),
+    stretching:      entry.sessions?entry.sessions.stretching:(existing.stretching??false),
     tdee_kcal:       pick(entry.tdee,          'tdee_kcal'),
     deficit_kcal:    pick(entry.deficit,       'deficit_kcal'),
     notes:           (entry.activity&&entry.activity.trim())?entry.activity:(existing.notes||'')
@@ -912,28 +919,6 @@ function updateHeaderSub(){
   const g=p.goals?p.goals.split(',').filter(Boolean):[];
   const goalStr=g.length>0?g.slice(0,2).join(', ')+(g.length>2?' +'+( g.length-2):''):'active cut';
   document.getElementById('headerSub').textContent=`${currentUser} · ${p.gender||'?'} · ${p.height_cm||'?'}cm · ${goalStr}`;
-}
-
-// ── Goals ─────────────────────────────────────────────────────────
-const GOAL_COLORS={'Muscle-up':'#c8f060','Handstand':'#60c8f0','Visible abs':'#f0a060','Big chest':'#f06090',
-  'Lose weight':'#f06060','Build muscle':'#c8f060','Improve cardio':'#60c8f0','Flexibility':'#f0a060'};
-
-function renderGoals(){
-  const cw=getCurrentWeight();
-  const p=getProfile();
-  const sw=p.start_weight_kg||83.5;
-  const goals=(p.goals?p.goals.split(',').filter(Boolean):[]);
-  if(!goals.length){document.getElementById('goalsGrid').innerHTML='<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">no goals set</div>';return;}
-  document.getElementById('goalsGrid').innerHTML=goals.slice(0,4).map(g=>{
-    const color=GOAL_COLORS[g]||'#c8f060';
-    let pct=30,status='in progress';
-    if(g==='Lose weight'||g==='Visible abs'){
-      const target=sw-8;
-      pct=Math.min(100,Math.max(0,Math.round(((sw-cw)/(sw-target))*100)));
-      status=(cw-target).toFixed(1)+'kg to go';
-    }
-    return `<div class="goal-item"><div class="goal-name"><div class="goal-icon" style="background:${color}"></div>${g}</div><div class="goal-bar-bg"><div class="goal-bar" style="width:${pct}%;background:${color}"></div></div><div class="goal-status">${pct}% · ${status}</div></div>`;
-  }).join('');
 }
 
 // ── Logout ────────────────────────────────────────────────────────
@@ -1034,8 +1019,10 @@ async function saveSettings(){
 // ── Session toggles ───────────────────────────────────────────────
 function toggleSession(type){
   sessionState[type]=!sessionState[type];
-  document.getElementById(type==='calisthenics'?'tCalisthenics':'tTennis').classList.toggle('active',sessionState[type]);
-  document.getElementById(type==='calisthenics'?'tCalisthenicsVal':'tTennisVal').textContent=sessionState[type]?'~'+SESSION_KCAL[type]+' kcal added':'none today';
+  const btnId=type==='calisthenics'?'tCalisthenics':type==='tennis'?'tTennis':'tStretching';
+  const valId=type==='calisthenics'?'tCalisthenicsVal':type==='tennis'?'tTennisVal':'tStretchingVal';
+  document.getElementById(btnId).classList.toggle('active',sessionState[type]);
+  document.getElementById(valId).textContent=sessionState[type]?'~'+SESSION_KCAL[type]+' kcal added':'none today';
   updatePreview();
 }
 
@@ -1049,7 +1036,7 @@ function updatePreview(){
   const sleep=parseFloat(document.getElementById('fSleep').value);
   const wVal=parseFloat(document.getElementById('fWeight').value);
   const w=isNaN(wVal)?getCurrentWeight():wVal;
-  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0);
+  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0)+(sessionState.stretching?SESSION_KCAL.stretching:0);
   const intake=macroKcal(p,f,c);
   const tdee=calcTDEE(w,steps,isNaN(sed)?null:sed,isNaN(sleep)?null:sleep,bonus);
   const deficit=tdee-intake;
@@ -1090,10 +1077,10 @@ async function submitEntry(){
   const activity=document.getElementById('fActivity').value.trim();
   if(!weight&&!prot&&!activity){showToast('add at least one value');return;}
   const cal=(prot||fat||carbs)?macroKcal(prot,fat,carbs):null;
-  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0);
+  const bonus=(sessionState.calisthenics?SESSION_KCAL.calisthenics:0)+(sessionState.tennis?SESSION_KCAL.tennis:0)+(sessionState.stretching?SESSION_KCAL.stretching:0);
   const tdee=calcTDEE(weight,steps,sedentary,sleep,bonus);
   const deficit=cal!=null?tdee-cal:null;
-  const sessions={calisthenics:sessionState.calisthenics,tennis:sessionState.tennis};
+  const sessions={calisthenics:sessionState.calisthenics,tennis:sessionState.tennis,stretching:sessionState.stretching};
   const entry={date,weight,prot,fat,carbs,cal,steps,sedentary,sleep,sessions,tdee,deficit,activity};
   const btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='saving...';
@@ -1122,10 +1109,11 @@ async function submitEntry(){
     logs.sort((a,b)=>a.date.localeCompare(b.date));
     ['fWeight','fProt','fFat','fCarbs','fSteps','fSedentary','fSleep'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fActivity').value='';
-    sessionState.calisthenics=false;sessionState.tennis=false;
-    ['tCalisthenics','tTennis'].forEach(id=>document.getElementById(id).classList.remove('active'));
+    sessionState.calisthenics=false;sessionState.tennis=false;sessionState.stretching=false;
+    ['tCalisthenics','tTennis','tStretching'].forEach(id=>document.getElementById(id).classList.remove('active'));
     document.getElementById('tCalisthenicsVal').textContent='none today';
     document.getElementById('tTennisVal').textContent='none today';
+    document.getElementById('tStretchingVal').textContent='none today';
     updatePreview();render();
     setSyncStatus('synced ✓','ok');showToast('entry saved ✓');
     setTimeout(()=>setSyncStatus('',''),3000);
@@ -1403,32 +1391,224 @@ function renderStats(){
   const avg=(arr,key)=>{const v=arr.filter(l=>l[key]!=null);return v.length?v.reduce((s,l)=>s+l[key],0)/v.length:null;};
   const r7=logs.slice(-7);
   const a7cal=avg(r7,'cal'),a7prot=avg(r7,'prot'),a7def=avg(r7,'deficit');
-  // Dynamic targets from profile
-  const p=getProfile();
   const cw=getCurrentWeight();
-  const targetProt=Math.round(cw*2);
+
+  // Targets derived from profile + spec
+  const targetProt=Math.round(cw/2);          // bodyweight(g) / 500 → g = kg/2
+  const targetFat=Math.round(cw/2);           // same formula
+  const targetKcal=Math.round(calcTDEE(cw,null,null,null,0,true)-500); // good deficit midpoint
+
   document.getElementById('s7kcal').textContent=a7cal!=null?Math.round(a7cal).toLocaleString():'—';
-  document.getElementById('s7kcalTarget').textContent='target '+(calcTDEE(cw,null,null,null,0)-400).toLocaleString();
+  document.getElementById('s7kcalTarget').textContent='target ~'+targetKcal.toLocaleString();
   document.getElementById('s7prot').textContent=a7prot!=null?Math.round(a7prot)+'g':'—';
-  document.getElementById('s7protTarget').textContent='target '+targetProt+'g+';
+  document.getElementById('s7protTarget').textContent='min '+targetProt+'g · fat min '+targetFat+'g';
+
   const defEl=document.getElementById('s7deficit');
-  if(a7def!=null){defEl.textContent=(a7def>=0?'-':'+')+Math.abs(Math.round(a7def)).toLocaleString();defEl.className='stat-val '+(a7def>=200?'c-green':a7def>=0?'c-orange':'c-red');}
+  if(a7def!=null){defEl.textContent=(a7def>=0?'-':'+')+Math.abs(Math.round(a7def)).toLocaleString();defEl.className='stat-val '+(a7def>=300&&a7def<=700?'c-green':a7def>0?'c-orange':'c-red');}
   else{defEl.textContent='—';defEl.className='stat-val c-muted';}
+
   const pace=calcPace(allPts);
   const pEl=document.getElementById('sPace');
   if(pace!=null){pEl.textContent=pace.toFixed(2);pEl.className='stat-val '+(pace<-0.5?'c-green':pace<0?'c-orange':'c-red');}
   else{pEl.textContent='—';pEl.className='stat-val c-muted';}
 }
 
-// ── History ───────────────────────────────────────────────────────
+// ── Goal helpers ──────────────────────────────────────────────────
+function sessionsPerMonth(type,monthsBack=1){
+  // Count sessions of a given type in the last N complete months
+  const now=new Date();
+  const cutoff=new Date(now);
+  cutoff.setMonth(cutoff.getMonth()-monthsBack);
+  return logs.filter(l=>{
+    if(!l.sessions||!l.sessions[type]) return false;
+    const d=new Date(l.date+'T12:00:00');
+    return d>=cutoff&&d<=now;
+  }).length;
+}
+
+function avgSessionsPerMonth(type,months=3){
+  // Average sessions/month over the last N months
+  const total=sessionsPerMonth(type,months);
+  return total/months;
+}
+
+function avgDeficitLast30(){
+  const recent=logs.slice(-30).filter(l=>l.deficit!=null);
+  if(!recent.length) return null;
+  return recent.reduce((s,l)=>s+l.deficit,0)/recent.length;
+}
+
+function avgProteinLast30(){
+  const recent=logs.slice(-30).filter(l=>l.prot!=null);
+  if(!recent.length) return null;
+  return recent.reduce((s,l)=>s+l.prot,0)/recent.length;
+}
+
+function goodDeficitDaysPct(){
+  // % of logged days in last 30 with deficit 300-700
+  const recent=logs.slice(-30).filter(l=>l.deficit!=null);
+  if(!recent.length) return 0;
+  const good=recent.filter(l=>l.deficit>=300&&l.deficit<=700).length;
+  return good/recent.length;
+}
+
+function calcAbsGoalWeight(){
+  // Target body weight for visible abs: uses BMI ~20 as lean baseline
+  // Male: ~20 BMI = weight / height² → weight = 20 × (height/100)²
+  // Female: ~19 BMI
+  const p=getProfile();
+  const h=p.height_cm||175;
+  const bmi=p.gender==='female'?19:20;
+  return Math.round(bmi*(h/100)*(h/100)*10)/10;
+}
+
+function weeksToGoal(targetKg){
+  const pace=calcPace(getAllWeightPoints());
+  const cw=getCurrentWeight();
+  if(!pace||pace>=0) return null;
+  const kgToLose=cw-targetKg;
+  if(kgToLose<=0) return 0;
+  return Math.ceil(kgToLose/Math.abs(pace));
+}
+
+function formatGoalDate(weeks){
+  if(weeks===null) return 'pace needed';
+  if(weeks===0) return 'achieved';
+  const d=new Date();
+  d.setDate(d.getDate()+weeks*7);
+  return fmtDate(d.toISOString().slice(0,10));
+}
+
+// ── Goals ─────────────────────────────────────────────────────────
+const GOAL_COLORS={
+  'Muscle-up':'#2d6a4f','Handstand':'#6a4f2d','Visible abs':'#c05a2a',
+  'Big chest':'#7a4a8a','Lose weight':'#b83a2a','Build muscle':'#2d6a4f',
+  'Improve cardio':'#6a4f2d','Flexibility':'#c05a2a',
+  'Lose weight + Build muscle':'#7a4a8a'
+};
+
+function renderGoals(){
+  const cw=getCurrentWeight();
+  const p=getProfile();
+  const goals=p.goals?p.goals.split(',').filter(Boolean):[];
+  if(!goals.length){document.getElementById('goalsGrid').innerHTML='<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">no goals set — open settings to add goals</div>';return;}
+
+  const absGoalW=calcAbsGoalWeight();
+  const minProt=Math.round(cw/2);
+  const avgCal30=logs.slice(-30).filter(l=>l.cal!=null);
+  const avgDef30=avgDeficitLast30();
+  const avgProt30=avgProteinLast30();
+  const goodPct=goodDeficitDaysPct();
+  const calAvg=avgCal30.length?avgCal30.reduce((s,l)=>s+l.cal,0)/avgCal30.length:null;
+  const tdee=calcTDEE(cw,null,null,null,0,true);
+  const isInSurplus=calAvg!=null&&calAvg>tdee;
+
+  document.getElementById('goalsGrid').innerHTML=goals.slice(0,4).map(g=>{
+    const color=GOAL_COLORS[g]||'#2d6a4f';
+    let pct=0, status='', sub='';
+
+    if(g==='Visible abs'){
+      // Weight-based: target = calc lean weight for gender+height
+      const kgToLose=Math.max(0,cw-absGoalW);
+      const sw=p.start_weight_kg||cw+kgToLose;
+      const totalToLose=Math.max(0.1,sw-absGoalW);
+      pct=Math.min(100,Math.max(0,Math.round(((sw-cw)/totalToLose)*100)));
+      const weeks=weeksToGoal(absGoalW);
+      status=kgToLose<=0?'achieved — maintain weight':`${kgToLose.toFixed(1)}kg to go · target ${absGoalW}kg`;
+      sub=weeks!==null&&weeks>0?`est. ${formatGoalDate(weeks)}`:'';
+    }
+    else if(g==='Muscle-up'){
+      // 3 months × 12 cal/month + visible abs weight
+      const calSessions3m=avgSessionsPerMonth('calisthenics',3);
+      const calPct=Math.min(100,Math.round((calSessions3m/12)*100));
+      const weightPct=Math.min(100,Math.max(0,Math.round(((p.start_weight_kg||cw+5)-cw)/Math.max(0.1,(p.start_weight_kg||cw+5)-absGoalW)*100)));
+      pct=Math.round((calPct*0.6+weightPct*0.4));
+      const sessNeeded=Math.max(0,12-Math.round(calSessions3m));
+      status=`${Math.round(calSessions3m)}/12 cal sessions/mo avg`;
+      sub=sessNeeded>0?`+${sessNeeded} sessions/mo needed`:`weight: ${cw.toFixed(1)}→${absGoalW}kg`;
+    }
+    else if(g==='Handstand'){
+      // 6 months × 12 cal/month
+      const calSessions6m=avgSessionsPerMonth('calisthenics',6);
+      const monthsPct=Math.min(100,Math.round((calSessions6m/12)*100));
+      // Also need stretching consistency
+      const strSessions3m=avgSessionsPerMonth('stretching',3);
+      const strPct=Math.min(100,Math.round((strSessions3m/8)*100));
+      pct=Math.round((monthsPct*0.7+strPct*0.3));
+      status=`${Math.round(calSessions6m)}/12 cal sessions/mo avg (6m)`;
+      sub=`${Math.round(strSessions3m)}/8 stretch sessions/mo`;
+    }
+    else if(g==='Big chest'){
+      // 18 months × 12 cal/month + protein min
+      const calSessions3m=avgSessionsPerMonth('calisthenics',3);
+      const calPct=Math.min(100,Math.round((calSessions3m/12)*100));
+      const protPct=avgProt30!=null?Math.min(100,Math.round((avgProt30/minProt)*100)):0;
+      pct=Math.round((calPct*0.6+protPct*0.4));
+      status=`${Math.round(calSessions3m)}/12 cal sessions/mo avg`;
+      sub=avgProt30!=null?`protein: ${Math.round(avgProt30)}g avg (min ${minProt}g)`:`log protein to track`;
+    }
+    else if(g==='Lose weight'){
+      // Based on sustained caloric deficit
+      const sw=p.start_weight_kg||cw;
+      const target=Math.max(absGoalW,sw-5);
+      const lost=sw-cw;
+      const total=Math.max(0.1,sw-target);
+      pct=Math.min(100,Math.max(0,Math.round((lost/total)*100)));
+      status=`${Math.max(0,cw-target).toFixed(1)}kg to goal`;
+      sub=avgDef30!=null?`avg deficit: ${Math.round(avgDef30)} kcal/day`:'log calories to track';
+    }
+    else if(g==='Build muscle'){
+      // Surplus + protein + ≥8 cal sessions/mo
+      const calSessions=avgSessionsPerMonth('calisthenics',1);
+      const sessPct=Math.min(100,Math.round((calSessions/8)*100));
+      const protPct=avgProt30!=null?Math.min(100,Math.round((avgProt30/minProt)*100)):0;
+      const surplusPct=isInSurplus?100:0;
+      pct=Math.round((sessPct*0.4+protPct*0.4+surplusPct*0.2));
+      status=`${Math.round(calSessions)}/8 cal sessions/mo`;
+      sub=isInSurplus?`in surplus ✓`:`need caloric surplus`;
+    }
+    else if(g==='Lose weight + Build muscle'){
+      // Recomp: consistent good deficit (300-700 kcal)
+      pct=Math.round(goodPct*100);
+      const goodDays=Math.round(goodPct*30);
+      status=`${goodDays}/30 days in good deficit`;
+      sub='300–700 kcal daily deficit target';
+    }
+    else if(g==='Improve cardio'){
+      // 8 tennis sessions/month
+      const tennisMo=avgSessionsPerMonth('tennis',1);
+      pct=Math.min(100,Math.round((tennisMo/8)*100));
+      status=`${Math.round(tennisMo)}/8 tennis sessions this month`;
+      sub=tennisMo>=8?'target met ✓':'keep playing';
+    }
+    else if(g==='Flexibility'){
+      // Pre+post stretching sessions — target 8/month
+      const strMo=avgSessionsPerMonth('stretching',1);
+      pct=Math.min(100,Math.round((strMo/8)*100));
+      status=`${Math.round(strMo)}/8 stretch sessions this month`;
+      sub='log stretching sessions to track';
+    }
+    else {
+      pct=30; status='in progress'; sub='';
+    }
+
+    pct=Math.max(0,Math.min(100,pct));
+    return `<div class="goal-item">
+      <div class="goal-name"><div class="goal-icon" style="background:${color}"></div>${g}</div>
+      <div class="goal-bar-bg"><div class="goal-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div class="goal-status">${pct}% · ${status}</div>
+      ${sub?`<div class="goal-status" style="margin-top:2px;opacity:0.7">${sub}</div>`:''}
+    </div>`;
+  }).join('');
+}
 function renderHistory(){
   const list=document.getElementById('historyList');
   if(!logs.length){list.innerHTML='<div class="empty-state">no entries yet — log your first day above</div>';return;}
   list.innerHTML=[...logs].reverse().slice(0,30).map(l=>{
-    const hasCal=l.sessions&&l.sessions.calisthenics,hasTen=l.sessions&&l.sessions.tennis;
+    const hasCal=l.sessions&&l.sessions.calisthenics,hasTen=l.sessions&&l.sessions.tennis,hasStr=l.sessions&&l.sessions.stretching;
     const sClass=hasCal&&hasTen?'s-both':hasCal?'s-calisthenics':hasTen?'s-tennis':'';
     const defStr=l.deficit!=null?`<span class="${l.deficit>=0?'deficit-pos':'deficit-neg'}">${l.deficit>=0?'-':'+'}${Math.abs(Math.round(l.deficit)).toLocaleString()} kcal</span>`:'';
-    const extras=[l.steps?(Math.round(l.steps/100)/10)+'k steps':'',l.sedentary!=null?l.sedentary+'h desk':'',l.sleep!=null?l.sleep+'h sleep':'',hasCal?'calisthenics':'',hasTen?'tennis':''].filter(Boolean).join(' · ');
+    const extras=[l.steps?(Math.round(l.steps/100)/10)+'k steps':'',l.sedentary!=null?l.sedentary+'h desk':'',l.sleep!=null?l.sleep+'h sleep':'',hasCal?'calisthenics':'',hasTen?'tennis':'',hasStr?'stretching':''].filter(Boolean).join(' · ');
     return `<div class="entry ${sClass}">
       <div class="entry-top">
         <div class="entry-date">${fmtDate(l.date)}</div>
