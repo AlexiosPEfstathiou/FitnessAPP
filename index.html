@@ -1394,9 +1394,10 @@ function renderStats(){
   const cw=getCurrentWeight();
 
   // Targets derived from profile + spec
-  const targetProt=Math.round(cw/2);          // bodyweight(g) / 500 → g = kg/2
-  const targetFat=Math.round(cw/2);           // same formula
-  const targetKcal=Math.round(calcTDEE(cw,null,null,null,0,true)-500); // good deficit midpoint
+  // bodyweight(g) ÷ 500 = bodyweight(kg) × 1000 ÷ 500 = bodyweight(kg) × 2
+  const targetProt=Math.round(cw*2);          // bodyweight(kg) × 2
+  const targetFat=Math.round(cw/2);           // bodyweight(g) ÷ 2 = bodyweight(kg) × 500 → actually kg/2 per spec
+  const targetKcal=Math.round(calcTDEE(cw,null,null,null,0,true)-500);
 
   document.getElementById('s7kcal').textContent=a7cal!=null?Math.round(a7cal).toLocaleString():'—';
   document.getElementById('s7kcalTarget').textContent='target ~'+targetKcal.toLocaleString();
@@ -1494,7 +1495,7 @@ function renderGoals(){
   if(!goals.length){document.getElementById('goalsGrid').innerHTML='<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">no goals set — open settings to add goals</div>';return;}
 
   const absGoalW=calcAbsGoalWeight();
-  const minProt=Math.round(cw/2);
+  const minProt=Math.round(cw*2);
   const avgCal30=logs.slice(-30).filter(l=>l.cal!=null);
   const avgDef30=avgDeficitLast30();
   const avgProt30=avgProteinLast30();
